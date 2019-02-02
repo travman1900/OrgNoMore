@@ -22,7 +22,7 @@ for path in Path(src_dir).glob("**/*.mkv"):
     if data: # it matched the episode pattern
         sname, snum = data.groups()
         # make the dst folder
-        dst = os.path.join(dst_dir, sname, "Season "+snum)
+        dst = os.path.join(dst1_dir, sname, "Season "+snum)
         os.makedirs(dst1)
         shutil.move(str(path), str(dst1))
     else: #this is here to copy movies as they shouldnt follow ^ naming convention
