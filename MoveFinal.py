@@ -19,8 +19,6 @@ shows_dir = config['DEFAULT']['shows_directory']
 movies_dir = config['DEFAULT']['movies_directory']
 #This is currently set up in the INI for nfo jpeg srt and mkv. Substitute your media file type for MKV if different. I have not tested but if you follow format additonal types should be able to added.
 file_type = ast.literal_eval(config['DEFAULT']['file_type'])
-print(file_type)
-file_types = [ 'mkv', 'nfo' ]
 #This is here to prevent the program from stumbling on it self during the move process. I have tested as low as 1 and as high as 5 with no issue. adding a decimal will make it Milliseconds
 set_wait_timer = config ['DEFAULT']['wait_timer']
 #The regex is looking at filename IE (TVSHOW - S01E01 - Episode.mkv) Its look for S## after a -
