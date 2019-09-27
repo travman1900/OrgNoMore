@@ -14,22 +14,23 @@ import datetime
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-TVDB_TOKEN = ""
 TVDB_URL = "https://api.thetvdb.com"
-
 # * File path to look for episode files
-#! create check to make folders if they don texist
-#INCOMING_SHOWS = "C:\\Users\\Travis\\Desktop\\Test\\"
+
+#Directories
 INCOMING_SHOWS = config['DEFAULT']['source_shows_directory']
-#INCOMING_MOVIES = "C:\\Users\\Travis\\Desktop\\TestA\\"
 INCOMING_MOVIES = config['DEFAULT']['source_movies_directory']
-#DESTINATION_SHOWS = "C:\\Users\\Travis\\Desktop\\Test\\Completed\\"
 DESTINATION_SHOWS = config['DEFAULT']['shows_destination_directory']
-#DESTINATION_MOVIES = "C:\\Users\\Travis\\Desktop\\TestA\\Completed\\"
 DESTINATION_MOVIES = config['DEFAULT']['movies_destination_directory']
+#File Type
+FILE_TYPE = ast.literal_eval(config['FILE_TYPE']['file_type'])
 
-FILE_TYPE = ast.literal_eval(config['DEFAULT']['file_type'])
-
+#TVDB
+apikey = config['TVDB']['apikey']
+userkey = config['TVDB']['userkey']
+username = config['TVDB']['username']
+#OMDB
+omdb_apikey = config['OMDB']['apikey']
 print(DESTINATION_MOVIES)
 print(INCOMING_MOVIES)
 print(INCOMING_SHOWS)
@@ -37,15 +38,34 @@ print(DESTINATION_SHOWS)
 print(FILE_TYPE)
 
 #file_type = ast.literal_eval(config['DEFAULT']['file_type'])
+#*------------------- TVDB Auth ------------------
+def auth():
+
+    body = {
+        "apikey": str(apikey),
+        "userkey": str(userkey),
+        "username": str(username)
+    }
+    URL = "https://api.thetvdb.com/login"
+
+    response = requests.post(URL, json=body)
+    response = response.json()
+    
+    TVDB_TOKEN = response["token"]
+    
+    #print(response)
+    with open("auth.json", "w+") as f:
+        json.dump(response, f, indent=4)
+    return TVDB_TOKEN
+
+TVDB = auth()
 
 # * ----------------- Movie Info -----------------
 #! cleanup output for movie info (maybe jsonify?)
-
-
 def searchMovie(movieName):
     url = "http://www.omdbapi.com/"
     params = {
-        "apikey": "",
+        "apikey": omdb_apikey,
         "type": "movie",
         "t": movieName
     }
@@ -62,8 +82,6 @@ def searchMovie(movieName):
 
 # * ----------------- Series Info -----------------
 #! cleanup/streamline getSeriesID and getEpisodeInfo into 1 function to reduce clutter
-
-
 def getSeriesID(series):
     """Grabs series ID and Name from TVDB
     
@@ -73,9 +91,8 @@ def getSeriesID(series):
     Returns:
         json -- SeriesID and Name
     """
-
     endpoint = "/search/series"
-    headers = {"Authorization": f"Bearer {TVDB_TOKEN}"}
+    headers = {"Authorization": f"Bearer {TVDB}"}
     params = {"name": series}
 
     response = requests.get(
@@ -91,8 +108,6 @@ def getSeriesID(series):
     return results
 
 #! as stated above
-
-
 def getEpisodeInfo(seriesId, season, episode):
     """Gets Episode info in a JSON format
     
@@ -104,8 +119,9 @@ def getEpisodeInfo(seriesId, season, episode):
     Returns:
         json -- dictionary of all the information above
     """
+
     endpoint = f"/series/{seriesId}/episodes/query"
-    headers = {"Authorization": f"Bearer {TVDB_TOKEN}"}
+    headers = {"Authorization": f"Bearer {TVDB}"}
     params = {
         "id": seriesId,
         "airedSeason": int(season),
@@ -128,8 +144,7 @@ def directoryCrawler(filePath):  # + "*" + "mkv",
     #files = [file for path in Path(src_dir).glob("*"+FILE_TYPE)]
     fileList = []
     for ft in FILE_TYPE:
-        files = [file for file in glob.glob(
-            filePath + "*" + ft, recursive=True)]
+        files = [file for file in glob.glob(filePath + "*" + ft, recursive=True)]
         for item in files:
             fileName = basename(item)
             fileList.append(fileName)
@@ -138,7 +153,7 @@ def directoryCrawler(filePath):  # + "*" + "mkv",
 
 # * ----------------- File Parsing -----------------
 #! streamline parsing/rename function since its onl yused for episdoes
-#! also look into better regex matching for alternative file naming schemes. Idk how lul
+#! also look into better regex matching for alternative file naming schemes. Idk how lul 
 def parseFile(filename):
     # split file name at '.' to get file extension
     filename = filename.split(".")
@@ -147,8 +162,8 @@ def parseFile(filename):
     # split the first index of 'file' into a list
     filename = filename[0].split("-")
     # get episode/season, strip whitespace and S/E in name
-    episodeNum = int(filename[1][4:].strip().strip("E"))
-    seasonNum = int(filename[1][:4].strip().strip("S"))
+    episodeNum = int(filename[1][4:].strip().strip("E|e"))
+    seasonNum = int(filename[1][:4].strip().strip("S|s"))
 
     seriesName = filename[0].strip()
     # make new dictionary to hold the info we want
@@ -161,8 +176,6 @@ def parseFile(filename):
     return info
 
 #! maybe make this a bit cleaner upstream. Might need a rewrite
-
-
 def newFilename(filelist, mediatype):
     if mediatype == "episodes":
         for item in filelist:
@@ -179,8 +192,7 @@ def newFilename(filelist, mediatype):
             originalEpisode = episodeInfo["episodeNum"]
             extension = episodeInfo["extension"]
             # Grab updated Info from TVDB
-            episodeResults = getEpisodeInfo(
-                seriesId, originalSeason, originalEpisode)
+            episodeResults = getEpisodeInfo(seriesId, originalSeason, originalEpisode)
             # Updated show info
             series = seriesResults["name"]
             episodeName = episodeResults["data"][0]["episodeName"]
@@ -199,16 +211,14 @@ def newFilename(filelist, mediatype):
             #* mk series - Mk seasonNum
             #* add create folder for media
 
-            print(newFileName)
+            print(newFileName)            
             #* create series folder if doesnt exist
             makedirs(join(DESTINATION_SHOWS, series), exist_ok=True)
             #* make season folder if doesnt exist
-            makedirs(join(DESTINATION_SHOWS, series,
-                          f"Season {seasonNum}"), exist_ok=True)
+            makedirs(join(DESTINATION_SHOWS, series, f"Season {seasonNum}"), exist_ok=True)
             #* rename episode into corosponding season/series folder
-            rename(join(INCOMING_SHOWS, item), join(
-                DESTINATION_SHOWS, series, f"Season {seasonNum}", newFileName))
-
+            rename(join(INCOMING_SHOWS, item), join(DESTINATION_SHOWS, series, f"Season {seasonNum}", newFileName))
+    
     elif mediatype == "movies":
         for item in filelist:
             #split file name at '.' to get file extension
@@ -216,13 +226,11 @@ def newFilename(filelist, mediatype):
             #extention is at index 1 of the list we just made
             extension = filename[1]
             try:
-                # * index 0 of filename is the name minus the extension
-                newFileName = searchMovie(filename[0])
+                newFileName = searchMovie(filename[0]) #* index 0 of filename is the name minus the extension
                 #print("Hi")
 
                 makedirs(join(DESTINATION_MOVIES, newFileName), exist_ok=True)
-                rename(join(INCOMING_MOVIES, item), join(
-                    DESTINATION_MOVIES, newFileName, f"{newFileName}.{extension}"))
+                rename(join(INCOMING_MOVIES, item), join(DESTINATION_MOVIES, newFileName, f"{newFileName}.{extension}"))
             except KeyError as e:
                 print(e)
 
@@ -231,12 +239,10 @@ def newFilename(filelist, mediatype):
     #for item in filelist:
 
 #! incorporte watchdog for folder watching here.
-
-
 def main():
     print("STARTING!")
     #! make check to see if folder is empty and if it is then do nothing
-    while True:  # ! add watchdog
+    while True: #! add watchdog
         try:
             episodelist = directoryCrawler(INCOMING_SHOWS)
             movielist = directoryCrawler(INCOMING_MOVIES)
@@ -246,11 +252,10 @@ def main():
             if episodelist:
                 print(episodelist)
                 newFilename(episodelist, "episodes")
-
+            
             sleep(10)
         except KeyboardInterrupt:
             print("Exited!")
-
 
 if __name__ == "__main__":
     t = Thread(target=main)
