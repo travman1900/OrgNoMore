@@ -11,6 +11,10 @@ import configparser
 import ast
 import time
 import datetime
+
+	
+from pathvalidate import sanitize_filepath, sanitize_filename
+
 config = configparser.ConfigParser()
 config.read('config.ini')
 
@@ -31,13 +35,14 @@ userkey = config['TVDB']['userkey']
 username = config['TVDB']['username']
 #OMDB
 omdb_apikey = config['OMDB']['apikey']
+
+
 print(DESTINATION_MOVIES)
 print(INCOMING_MOVIES)
 print(INCOMING_SHOWS)
 print(DESTINATION_SHOWS)
 print(FILE_TYPE)
 
-#file_type = ast.literal_eval(config['DEFAULT']['file_type'])
 #*------------------- TVDB Auth ------------------
 def auth():
 
@@ -52,8 +57,7 @@ def auth():
     response = response.json()
     
     TVDB_TOKEN = response["token"]
-    
-    #print(response)
+
     with open("auth.json", "w+") as f:
         json.dump(response, f, indent=4)
     return TVDB_TOKEN
@@ -76,7 +80,6 @@ def searchMovie(movieName):
         with open("movieresults.json", "w+") as f:
             json.dump(response.json(), f, indent=4)
         result = response.json()
-        #print(len(result))
         newName = f"{result['Title']} ({result['Year']})"
         return newName
 
@@ -211,13 +214,15 @@ def newFilename(filelist, mediatype):
             #* mk series - Mk seasonNum
             #* add create folder for media
 
-            print(newFileName)            
+            print(newFileName)
+            fname = newFileName
+            #print("{} -> {}".format(fname, sanitize_filename(fname)))
             #* create series folder if doesnt exist
             makedirs(join(DESTINATION_SHOWS, series), exist_ok=True)
             #* make season folder if doesnt exist
             makedirs(join(DESTINATION_SHOWS, series, f"Season {seasonNum}"), exist_ok=True)
             #* rename episode into corosponding season/series folder
-            rename(join(INCOMING_SHOWS, item), join(DESTINATION_SHOWS, series, f"Season {seasonNum}", newFileName))
+            rename(join(INCOMING_SHOWS, item), join(DESTINATION_SHOWS, series, f"Season {seasonNum}", sanitize_filename(fname)))
     
     elif mediatype == "movies":
         for item in filelist:
@@ -230,7 +235,7 @@ def newFilename(filelist, mediatype):
                 #print("Hi")
 
                 makedirs(join(DESTINATION_MOVIES, newFileName), exist_ok=True)
-                rename(join(INCOMING_MOVIES, item), join(DESTINATION_MOVIES, newFileName, f"{newFileName}.{extension}"))
+                rename(join(INCOMING_MOVIES, item), join(DESTINATION_MOVIES, newFileName, f"{sanitize_filename(newFileName)}.{extension}"))
             except KeyError as e:
                 print(e)
 
